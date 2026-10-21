@@ -12,8 +12,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p .",
     "icon": "node scripts/make-icon.mjs",
-    "dist:win": "npm run build && npm run icon && electron-builder --win nsis portable",
-    "dist:win:zip": "npm run build && npm run icon && electron-builder --win zip"
+    "dist:win": "npm run build && npm run icon && electron-builder --win nsis portable --publish never",
+    "dist:win:zip": "npm run build && npm run icon && electron-builder --win zip --publish never"
   },
   "repository": {
     "type": "git",
