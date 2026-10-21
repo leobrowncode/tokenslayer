@@ -1,0 +1,56 @@
+{
+  "name": "tokenslayer",
+  "productName": "TokenSlayer",
+  "version": "0.1.0",
+  "description": "Always-on-top Windows overlay showing token usage for Cursor, Claude Code and Codex, with alerts to compact or start a new chat.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "probe": "npm run build && node dist/probe.js",
+    "demo": "npm run build && node dist/demo.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p .",
+    "icon": "node scripts/make-icon.mjs",
+    "dist:win": "npm run build && npm run icon && electron-builder --win nsis portable",
+    "dist:win:zip": "npm run build && npm run icon && electron-builder --win zip"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leobrowncode/tokenslayer.git"
+  },
+  "license": "MIT",
+  "build": {
+    "appId": "com.tokenslayer.overlay",
+    "productName": "TokenSlayer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "portable": {
+      "artifactName": "TokenSlayer-${version}-portable.exe"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
