@@ -135,6 +135,8 @@ export class CodexProvider implements Provider {
     snap.usageSource = 'local session logs';
 
     const states = this.tailer.entriesList();
+    const lastAt = Math.max(0, ...states.map(([, s]) => s.lastAt));
+    if (lastAt > 0) snap.lastActivityAt = lastAt;
     const latestLimits = states
       .map(([, s]) => s.rateLimits)
       .filter((r): r is NonNullable<typeof r> => Boolean(r))

@@ -9,7 +9,8 @@ const api: OverlayApi = {
     ipcRenderer.on('overlay:open-advice', () => cb());
   },
   ready: () => ipcRenderer.send('overlay:ready'),
-  resize: (height) => ipcRenderer.send('overlay:resize', height),
+  resize: (width, height) => ipcRenderer.send('overlay:resize', width, height),
+  drag: (phase, dx, dy) => ipcRenderer.send('overlay:drag', phase, dx, dy),
   copy: (text) => ipcRenderer.send('overlay:copy', text),
   setExpanded: (expanded) => ipcRenderer.send('overlay:set-expanded', expanded),
   dismiss: (a) => ipcRenderer.send('overlay:dismiss', a),

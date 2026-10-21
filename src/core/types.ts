@@ -30,7 +30,12 @@ export interface ChatInfo {
 export interface ProviderSnapshot {
   id: ProviderId;
   name: string;
+  /** The tool's local data was found on this machine. */
   detected: boolean;
+  /** The tool is being used right now: its process is running or it logged activity recently. */
+  inUse: boolean;
+  running: boolean;
+  lastActivityAt?: number;
   usageToday: TokenUsage;
   tokensToday: number;
   usageSource?: string;

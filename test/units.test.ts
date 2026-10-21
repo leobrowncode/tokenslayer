@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { applyActivity, parseTasklist, runningTools } from '../src/core/activity';
 import { AlertTracker, buildAdvice, levelFor } from '../src/core/advisor';
 import { DEFAULT_CONFIG, mergeConfig } from '../src/core/config';
 import { formatDuration, formatTokens } from '../src/core/format';
@@ -11,6 +12,7 @@ import { codexContextPercent, codexLimits } from '../src/core/providers/codex';
 import { contextHint, resolveCursorContext } from '../src/core/providers/cursor';
 import { cursorUserId, parseLegacyUsage, parseUsageSummary } from '../src/core/providers/cursorApi';
 import { parseClaudeUsageResponse } from '../src/core/providers/claude';
+import { snapToTaskbar, stripPosition, taskbarRect } from '../src/core/taskbar';
 import { UsageLedger, parseTime, windowLabel } from '../src/core/tokens';
 import type { Advice, ProviderSnapshot } from '../src/core/types';
 import { fakeJwt } from '../src/tools/demoHome';
@@ -156,7 +158,7 @@ describe('claude usage api', () => {
 
 describe('advisor', () => {
   const snap = (pcts: number[]): ProviderSnapshot => ({
-    id: 'claude', name: 'Claude Code', detected: true, usageToday: { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 }, tokensToday: 0, limits: [], notes: [],
+    id: 'claude', name: 'Claude Code', detected: true, inUse: true, running: false, usageToday: { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 }, tokensToday: 0, limits: [], notes: [],
     chats: pcts.map((p, i) => ({ id: `c${i}`, contextTokens: p * 2000, contextWindow: 200000, contextPercent: p, updatedAt: 0 })),
   });
 
@@ -187,6 +189,64 @@ describe('advisor', () => {
     const escalated = t.process(adv(88));
     expect(escalated.visible).toHaveLength(1);
     expect(escalated.notify).toHaveLength(1);
+  });
+});
+
+describe('activity', () => {
+  const MIN = 60_000;
+  const base = (id: ProviderSnapshot['id'], extra: Partial<ProviderSnapshot>): ProviderSnapshot => ({
+    id, name: id, detected: true, inUse: false, running: false, usageToday: { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 }, tokensToday: 0, chats: [], limits: [], notes: [], ...extra,
+  });
+
+  it('recognises Cursor, Claude Code and Codex executables on Windows and Unix', () => {
+    const names = parseTasklist('"System Idle Process","0","Services","0","8 K"\r\n"Cursor.exe","412","Console","1","210,000 K"\r\n"codex-x86_64-pc-windows-msvc.exe","9","Console","1","5 K"\r\n');
+    expect(names).toEqual(['System Idle Process', 'Cursor.exe', 'codex-x86_64-pc-windows-msvc.exe']);
+    expect([...runningTools(names)].sort()).toEqual(['codex', 'cursor']);
+    expect([...runningTools(['/usr/bin/claude', 'Cursor Helper (Renderer)', 'codexbar', 'node'])]).toEqual(['claude']);
+  });
+
+  it('marks a tool in use when it runs or logged activity recently, never when its data is missing', () => {
+    const now = 1_000 * MIN;
+    const list = [
+      base('cursor', { lastActivityAt: now - 300 * MIN }),
+      base('claude', { lastActivityAt: now - 5 * MIN }),
+      base('codex', { detected: false }),
+    ];
+    applyActivity(list, new Set(['cursor', 'codex']), DEFAULT_CONFIG, now);
+    expect(list.map((p) => [p.id, p.running, p.inUse])).toEqual([
+      ['cursor', true, true],
+      ['claude', false, true],
+      ['codex', true, false],
+    ]);
+
+    applyActivity(list, undefined, DEFAULT_CONFIG, now + 40 * MIN);
+    expect(list.map((p) => p.inUse)).toEqual([false, false, false]);
+
+    const all = mergeConfig(DEFAULT_CONFIG, { activity: { showAll: true } });
+    applyActivity(list, undefined, all, now);
+    expect(list.map((p) => p.inUse)).toEqual([true, true, false]);
+  });
+});
+
+describe('taskbar placement', () => {
+  const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
+
+  it('centers the strip on a bottom taskbar, left of the tray', () => {
+    const work = { x: 0, y: 0, width: 1920, height: 1032 };
+    expect(taskbarRect(bounds, work)).toEqual({ edge: 'bottom', x: 0, y: 1032, width: 1920, height: 48 });
+    expect(stripPosition(bounds, work, { width: 200, height: 26 }, 360)).toEqual({ x: 1360, y: 1043 });
+  });
+
+  it('handles top, vertical and auto-hidden taskbars', () => {
+    expect(stripPosition(bounds, { x: 0, y: 40, width: 1920, height: 1040 }, { width: 200, height: 26 }, 360)).toEqual({ x: 1360, y: 7 });
+    expect(stripPosition(bounds, { x: 62, y: 0, width: 1858, height: 1080 }, { width: 200, height: 26 }, 360)).toEqual({ x: 1708, y: 1042 });
+    expect(stripPosition(bounds, bounds, { width: 200, height: 26 }, 360)).toEqual({ x: 1360, y: 1047 });
+  });
+
+  it('snaps a dropped strip back onto the taskbar only when dropped near it', () => {
+    const work = { x: 0, y: 0, width: 1920, height: 1032 };
+    expect(snapToTaskbar(bounds, work, { x: 500, y: 1050, width: 200, height: 26 })).toBe(1043);
+    expect(snapToTaskbar(bounds, work, { x: 500, y: 400, width: 200, height: 26 })).toBe(400);
   });
 });
 

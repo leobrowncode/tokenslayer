@@ -479,3 +479,50 @@ body {
 .locked .header {
   -webkit-app-region: no-drag;
 }
+
+.strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: rgba(20, 22, 30, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: grab;
+}
+
+.strip:active {
+  cursor: grabbing;
+}
+
+.strip.locked {
+  cursor: default;
+}
+
+.strip .tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.strip .dot {
+  width: 7px;
+  height: 7px;
+}
+
+.strip .tname {
+  color: var(--muted);
+}
+
+.strip b {
+  font-weight: 600;
+}
+
+.strip .idle {
+  color: var(--muted);
+}

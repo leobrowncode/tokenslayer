@@ -17,7 +17,7 @@ export interface Provider {
 }
 
 export function baseSnapshot(id: ProviderId, name: string): ProviderSnapshot {
-  return { id, name, detected: false, usageToday: emptyUsage(), tokensToday: 0, chats: [], limits: [], notes: [] };
+  return { id, name, detected: false, inUse: false, running: false, usageToday: emptyUsage(), tokensToday: 0, chats: [], limits: [], notes: [] };
 }
 
 export function makeChat(c: Omit<ChatInfo, 'contextPercent'>): ChatInfo {
