@@ -182,6 +182,7 @@ interface LocalCache {
   chats: ChatInfo[];
   usageToday: TokenUsage;
   accessToken?: string;
+  lastActivityAt?: number;
 }
 
 export class CursorProvider implements Provider {
@@ -210,6 +211,7 @@ export class CursorProvider implements Provider {
     snap.chats = (local?.chats ?? []).filter((c) => c.updatedAt >= ctx.now - maxAge);
     snap.usageToday = local?.usageToday ?? emptyUsage();
     snap.usageSource = 'local chat history';
+    snap.lastActivityAt = local?.lastActivityAt;
 
     if (ctx.config.network.cursorApi && local?.accessToken) {
       const token = local.accessToken;
@@ -255,6 +257,7 @@ export class CursorProvider implements Provider {
       }
 
       const newest = composers[0]?.updatedAt ?? composers[0]?.createdAt ?? 0;
+      const lastActivityAt = newest || undefined;
       const activeRows = composers
         .filter((c, i) => i === 0 || (c.updatedAt ?? 0) >= newest - PARALLEL_CHAT_MS)
         .slice(0, 3);
@@ -303,7 +306,7 @@ export class CursorProvider implements Provider {
           estimated: ctxInfo.estimated,
         });
       });
-      return { chats, usageToday, accessToken };
+      return { chats, usageToday, accessToken, lastActivityAt };
     } finally {
       db.close();
     }

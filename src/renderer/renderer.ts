@@ -133,7 +133,7 @@ function renderHeader(s: OverlaySnapshot | null, ui: OverlayUpdate['ui']): HTMLE
 }
 
 function renderGlobal(s: OverlaySnapshot): HTMLElement {
-  const detected = s.providers.filter((p) => p.detected);
+  const detected = s.providers.filter((p) => p.inUse);
   const denom = s.dailyBudget > 0 ? Math.max(s.dailyBudget, s.tokensToday) : Math.max(1, s.tokensToday);
   const b = h('div', { class: 'bar thick' });
   let left = 0;
@@ -276,16 +276,62 @@ function renderChips(s: OverlaySnapshot, providers: ProviderSnapshot[]): HTMLEle
   return wrap;
 }
 
+function stripTip(p: ProviderSnapshot, now: number): string {
+  const c = p.chats[0];
+  const lines = [`${p.name}: ${p.tokensToday.toLocaleString()} tokens today`];
+  if (c) lines.push(`Context ${c.estimated ? '~' : ''}${Math.round(c.contextPercent)}% (${formatTokens(c.contextTokens)} / ${formatTokens(c.contextWindow)})`);
+  for (const l of p.limits) lines.push(`${l.label} limit ${Math.round(l.usedPercent)}%`);
+  lines.push(p.running ? 'Running' : p.lastActivityAt ? `Last active ${formatAgo(now - p.lastActivityAt)}` : '');
+  return lines.filter(Boolean).join('\n');
+}
+
+function renderStrip(s: OverlaySnapshot | null, ui: OverlayUpdate['ui']): void {
+  root.className = `strip${ui.clickThrough ? ' locked' : ''}`;
+  if (!s) {
+    root.replaceChildren(h('span', { class: 'idle' }, '…'));
+    return;
+  }
+  const used = s.providers.filter((p) => p.inUse);
+  if (!used.length) {
+    root.replaceChildren(h('span', { class: 'idle', title: 'No Cursor, Claude Code or Codex activity right now' }, 'idle'));
+    return;
+  }
+  root.replaceChildren(
+    ...used.map((p) =>
+      h(
+        'span',
+        { class: 'tool', title: stripTip(p, s.generatedAt) },
+        h('span', { class: 'dot', style: { '--c': PROVIDER_COLOR[p.id] } }),
+        h('span', { class: 'tname' }, shortName(p.id)),
+        h('b', {}, formatTokens(p.tokensToday)),
+      ),
+    ),
+  );
+}
+
 function render(): void {
   if (!state) return;
   const { snapshot: s, ui } = state;
+  if (ui.mode === 'taskbar') {
+    renderStrip(s, ui);
+    return;
+  }
   root.className = `overlay level-${s?.topLevel ?? 'ok'}${ui.clickThrough ? ' locked' : ''}`;
   root.replaceChildren(renderHeader(s, ui));
   if (!s) return;
 
-  const shown = s.providers.filter((p) => p.detected || ui.showUndetected);
-  if (!s.providers.some((p) => p.detected)) {
-    root.append(h('div', { class: 'empty' }, 'No Cursor, Claude Code or Codex data found yet. Use one of them, or set custom paths in the config file (tray menu → Open config file).'));
+  const shown = s.providers.filter((p) => p.inUse || (ui.showUndetected && !p.detected));
+  if (!s.providers.some((p) => p.inUse)) {
+    const anyData = s.providers.some((p) => p.detected);
+    root.append(
+      h(
+        'div',
+        { class: 'empty' },
+        anyData
+          ? 'Cursor, Claude Code and Codex are not in use right now.'
+          : 'No Cursor, Claude Code or Codex data found yet. Use one of them, or set custom paths in the config file (tray menu → Open config file).',
+      ),
+    );
     return;
   }
   root.append(renderGlobal(s));
@@ -295,13 +341,13 @@ function render(): void {
     const list = h('div', { class: 'providers' });
     for (const p of shown) list.append(renderCard(p, s));
     root.append(list);
-    const missing = s.providers.filter((p) => !p.detected).map((p) => p.name);
+    const missing = s.providers.filter((p) => !p.inUse).map((p) => p.name);
     const notes = s.providers.flatMap((p) => p.notes.map((n) => `${p.name}: ${n}`));
     const footer = h(
       'div',
       { class: 'footer', title: notes.join('\n') },
       h('span', {}, `Updated ${new Date(s.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}${notes.length ? ` · ${notes.length} note${notes.length > 1 ? 's' : ''}` : ''}`),
-      h('span', {}, missing.length && !ui.showUndetected ? `Not found: ${missing.join(', ')}` : ui.clickThrough ? `Locked · ${ui.clickThroughShortcut}` : ''),
+      h('span', {}, missing.length && !ui.showUndetected ? `Not in use: ${missing.join(', ')}` : ui.clickThrough ? `Locked · ${ui.clickThroughShortcut}` : ''),
     );
     root.append(footer);
   } else {
@@ -322,9 +368,31 @@ api.onOpenAdvice(() => {
   render();
 });
 
-new ResizeObserver(() => api.resize(Math.ceil(root.getBoundingClientRect().height))).observe(root);
+new ResizeObserver(() => {
+  const r = root.getBoundingClientRect();
+  api.resize(Math.ceil(r.width), Math.ceil(r.height));
+}).observe(root);
 root.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   api.menu();
 });
+
+// The strip has no title bar, so it is dragged by hand; drag regions would swallow the right-click menu.
+let dragFrom: { x: number; y: number } | null = null;
+root.addEventListener('pointerdown', (e) => {
+  if (state?.ui.mode !== 'taskbar' || e.button !== 0) return;
+  dragFrom = { x: e.screenX, y: e.screenY };
+  root.setPointerCapture(e.pointerId);
+  api.drag('start', 0, 0);
+});
+root.addEventListener('pointermove', (e) => {
+  if (dragFrom) api.drag('move', e.screenX - dragFrom.x, e.screenY - dragFrom.y);
+});
+const endDrag = (e: PointerEvent) => {
+  if (!dragFrom) return;
+  api.drag('end', e.screenX - dragFrom.x, e.screenY - dragFrom.y);
+  dragFrom = null;
+};
+root.addEventListener('pointerup', endDrag);
+root.addEventListener('pointercancel', endDrag);
 api.ready();

@@ -130,6 +130,8 @@ export class ClaudeProvider implements Provider {
 
     snap.usageToday = this.ledger.sumSince(startOfLocalDay(ctx.now));
     snap.usageSource = 'local transcripts';
+    const lastAt = Math.max(0, ...this.tailer.entriesList().map(([, s]) => s.lastAt));
+    if (lastAt > 0) snap.lastActivityAt = lastAt;
 
     const maxAge = ctx.config.activeChatMaxAgeMinutes * 60_000;
     const configured = ctx.config.contextWindows.claude;

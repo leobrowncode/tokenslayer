@@ -15,6 +15,15 @@ export interface Config {
   pollIntervalSeconds: number;
   notifications: boolean;
   providers: { cursor: boolean; claude: boolean; codex: boolean };
+  /** Decides which tools count as "in use" and are shown. */
+  activity: {
+    /** Treat a tool as in use while its process (Cursor, claude, codex) is running. */
+    processes: boolean;
+    /** Treat a tool as in use if it logged activity this recently. 0 = processes only. */
+    recentMinutes: number;
+    /** Show every tool whose data exists, used or not. */
+    showAll: boolean;
+  };
   network: {
     /** Read Cursor's session token from its local DB and query cursor.com for plan usage. */
     cursorApi: boolean;
@@ -38,6 +47,16 @@ export interface Config {
     cursorStateDb: string;
   };
   overlay: {
+    /** `taskbar`: one-line token strip sitting on the taskbar. `panel`: detailed floating panel. */
+    mode: 'taskbar' | 'panel';
+    taskbar: {
+      /** Right edge and top of the strip once dragged; null = docked left of the system tray. */
+      right: number | null;
+      y: number | null;
+      /** Default gap between the strip and the right end of the taskbar (keeps the tray and clock visible). */
+      rightMargin: number;
+    };
+    /** Panel position and width. */
     x: number | null;
     y: number | null;
     width: number;
@@ -59,10 +78,13 @@ export const DEFAULT_CONFIG: Config = {
   pollIntervalSeconds: 10,
   notifications: true,
   providers: { cursor: true, claude: true, codex: true },
+  activity: { processes: true, recentMinutes: 30, showAll: false },
   network: { cursorApi: true, claudeUsageApi: true, intervalSeconds: 180 },
   contextWindows: { claude: 0, codex: 0, cursor: 200_000 },
   paths: { claudeDirs: [], codexHome: '', cursorStateDb: '' },
   overlay: {
+    mode: 'taskbar',
+    taskbar: { right: null, y: null, rightMargin: 360 },
     x: null,
     y: null,
     width: 340,

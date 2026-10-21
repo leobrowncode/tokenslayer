@@ -154,8 +154,10 @@ describe('CursorProvider', () => {
 });
 
 describe('collectSnapshot', () => {
+  const noProcesses = async () => [];
+
   it('combines providers into a global total with advice', async () => {
-    const snap = await collectSnapshot(createProviders(), cfg, { now: NOW });
+    const snap = await collectSnapshot(createProviders(), cfg, { now: NOW, listProcesses: noProcesses });
     const byId = Object.fromEntries(snap.providers.map((p) => [p.id, p.tokensToday]));
     expect(byId).toEqual({ claude: 92600, codex: 56000, cursor: 151000 });
     expect(snap.tokensToday).toBe(299600);
@@ -169,7 +171,27 @@ describe('collectSnapshot', () => {
 
   it('counts cache reads when configured', async () => {
     const c = { ...cfg, includeCacheReads: true };
-    const snap = await collectSnapshot(createProviders(), c, { now: NOW });
+    const snap = await collectSnapshot(createProviders(), c, { now: NOW, listProcesses: noProcesses });
     expect(snap.tokensToday).toBe(299600 + 170000 + 160000);
+  });
+
+  it('only marks tools that run or were active recently as in use', async () => {
+    const c = structuredClone(cfg);
+    c.activity.recentMinutes = 10;
+    const inUse = async (names: string[]) => {
+      const snap = await collectSnapshot(createProviders(), c, { now: NOW, listProcesses: async () => names });
+      return Object.fromEntries(snap.providers.map((p) => [p.id, p.inUse]));
+    };
+    // Sample data: Claude last wrote 1 min ago, Cursor 2 min ago, Codex 19 min ago.
+    expect(await inUse([])).toEqual({ cursor: true, claude: true, codex: false });
+    expect(await inUse(['codex.exe'])).toEqual({ cursor: true, claude: true, codex: true });
+
+    c.activity.recentMinutes = 0;
+    expect(await inUse(['Cursor.exe'])).toEqual({ cursor: true, claude: false, codex: false });
+
+    c.activity.processes = false;
+    let called = false;
+    await collectSnapshot(createProviders(), c, { now: NOW, listProcesses: async () => ((called = true), ['Cursor.exe']) });
+    expect(called).toBe(false);
   });
 });
