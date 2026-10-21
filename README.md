@@ -4,9 +4,39 @@ A small always-on-top overlay for Windows that shows how many tokens you are bur
 **Claude Code** and **Codex**. It also flags the chat that should be **compacted** or replaced
 with a **new chat** before a long context history keeps eating your quota.
 
+![taskbar strip](docs/overlay-taskbar.png)
+
+## Taskbar strip (default)
+
+By default the overlay is a single thin strip that sits on the Windows taskbar, just left of the
+tray and clock. It only shows **today's tokens for each tool you are using right now**, for example
+`Cursor 151k · Claude 92.6k · Codex 56k`. Hover a tool for details (context %, plan limits, last activity).
+
+A tool counts as **in use** when:
+
+- its process is running (`Cursor.exe`, `claude.exe`, `codex*.exe`; the Claude Code and Codex IDE
+  extensions launch the same binaries), or
+- it logged activity in the last `activity.recentMinutes` (30 by default). This also catches Claude
+  Code installed through npm, which runs as `node.exe`.
+
+Tools that are not in use drop out of the strip. If none is in use, the strip shows `idle`.
+
+- **Move**: drag the strip anywhere. Dropped on the taskbar, it snaps back to the taskbar's
+  vertical center. Its right edge stays fixed as numbers grow.
+- **Menu**: right-click (switch to the detailed panel, lock, reset position, quit).
+- It re-asserts itself above the taskbar every 1.5 s, because clicking the taskbar raises the taskbar
+  over other always-on-top windows.
+
+Compact / new-chat alerts still arrive as Windows toasts and through the tray icon's color.
+
+## Detailed panel
+
+Switch to it from the right-click menu or the tray menu (*Detailed panel*), or set
+`overlay.mode` to `"panel"`. It only lists the tools in use.
+
 ![expanded overlay](docs/overlay-expanded.png) ![collapsed overlay](docs/overlay-collapsed.png)
 
-## What it shows
+## What the panel shows
 
 - **Global bar**: tokens used today across all three tools, stacked by tool, against a daily budget
   you choose (`dailyTokenBudget`, default 5M). Cache reads are left out by default because they are
@@ -32,11 +62,12 @@ The tray icon changes color with the worst alert (green, amber, red) and its too
 
 1. Download `TokenSlayer-<version>-portable.exe` (no install) or `TokenSlayer Setup <version>.exe`
    from the **build** workflow artifacts in GitHub Actions, or build it yourself (see below).
-2. Run it. The overlay appears in the top-right corner, and a tray icon gives you the menu.
+2. Run it. The strip appears on the taskbar, and a tray icon gives you the menu.
 
 | Action | How |
 | --- | --- |
-| Move | drag the header |
+| Move | drag the strip (or the panel's header) |
+| Strip / detailed panel | right-click the overlay, or the tray menu |
 | Show / hide | `Ctrl+Alt+T`, tray icon click, or the × button |
 | Click-through (lock so it never steals clicks) | `Ctrl+Alt+K` or tray menu |
 | Settings | tray menu → *Open config file*, then *Reload config* |
@@ -84,6 +115,7 @@ with the `TOKENSLAYER_CONFIG` environment variable.
   "pollIntervalSeconds": 10,
   "notifications": true,
   "providers": { "cursor": true, "claude": true, "codex": true },
+  "activity": { "processes": true, "recentMinutes": 30, "showAll": false },  // what counts as "in use"
   "network": { "cursorApi": true, "claudeUsageApi": true, "intervalSeconds": 180 },
   "contextWindows": { "claude": 0, "codex": 0, "cursor": 200000 },  // 0 = auto
   "paths": {
@@ -91,7 +123,9 @@ with the `TOKENSLAYER_CONFIG` environment variable.
     "codexHome": "",
     "cursorStateDb": ""
   },
-  "overlay": { "x": null, "y": null, "width": 340, "opacity": 0.94, "expanded": true,
+  "overlay": { "mode": "taskbar",          // or "panel"
+               "taskbar": { "right": null, "y": null, "rightMargin": 360 },  // null = docked left of the tray
+               "x": null, "y": null, "width": 340, "opacity": 0.94, "expanded": true,
                "clickThrough": false, "showUndetected": false,
                "toggleShortcut": "Control+Alt+T", "clickThroughShortcut": "Control+Alt+K" }
 }
