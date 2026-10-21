@@ -31,6 +31,8 @@ let timer: NodeJS.Timeout | null = null;
 let busy = false;
 let quitting = false;
 let last: OverlaySnapshot | null = null;
+/** Where the overlay's top-left should stay while its height follows the content. */
+let anchor = { x: 0, y: 0 };
 const providers = createProviders();
 const tracker = new AlertTracker();
 const iconCache = new Map<string, NativeImage>();
@@ -87,6 +89,7 @@ function initialPosition(width: number): { x: number; y: number } {
 function createWindow(): void {
   const width = config.overlay.width;
   const pos = initialPosition(width);
+  anchor = { ...pos };
   win = new BrowserWindow({
     ...pos,
     width,
@@ -123,6 +126,8 @@ function createWindow(): void {
     moveTimer = setTimeout(() => {
       if (!win) return;
       const [x, y] = win.getPosition();
+      if (Math.abs(x - anchor.x) <= 2 && Math.abs(y - anchor.y) <= 2) return;
+      anchor = { x, y };
       config.overlay.x = x;
       config.overlay.y = y;
       persist();
@@ -226,6 +231,7 @@ function resetPosition(): void {
   persist();
   if (win) {
     const pos = initialPosition(config.overlay.width);
+    anchor = { ...pos };
     win.setPosition(pos.x, pos.y);
     showOverlay();
   }
@@ -314,8 +320,10 @@ function registerIpc(): void {
   ipcMain.on('overlay:resize', (_e, height: unknown) => {
     if (!win || typeof height !== 'number' || !Number.isFinite(height)) return;
     const h = Math.round(Math.max(36, Math.min(900, height)));
-    const b = win.getBounds();
-    if (b.height !== h) win.setBounds({ ...b, width: config.overlay.width, height: h });
+    const [w, cur] = win.getSize();
+    if (cur === h && w === config.overlay.width) return;
+    // setSize is ignored for non-resizable windows on some platforms; setBounds is not.
+    win.setBounds({ x: anchor.x, y: anchor.y, width: config.overlay.width, height: h });
   });
   ipcMain.on('overlay:copy', (_e, text: unknown) => {
     if (typeof text === 'string' && text.length < 200) clipboard.writeText(text);

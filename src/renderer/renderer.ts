@@ -43,13 +43,14 @@ type Child = Node | string | null | undefined | false;
 
 function h<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  props: { class?: string; title?: string; style?: string; onclick?: () => void } = {},
+  props: { class?: string; title?: string; style?: Record<string, string>; onclick?: () => void } = {},
   ...children: Child[]
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
   if (props.class) el.className = props.class;
   if (props.title) el.title = props.title;
-  if (props.style) el.setAttribute('style', props.style);
+  // The CSP forbids style attributes; CSSOM property writes are allowed.
+  if (props.style) for (const [k, v] of Object.entries(props.style)) el.style.setProperty(k, v);
   if (props.onclick) el.addEventListener('click', props.onclick);
   for (const c of children) {
     if (c === null || c === undefined || c === false) continue;
@@ -71,8 +72,8 @@ function levelOf(pct: number, s: OverlaySnapshot): AlertLevel {
 
 function bar(pct: number, cls: string, marks: number[] = [], thick = false): HTMLElement {
   const b = h('div', { class: `bar${thick ? ' thick' : ''}` });
-  b.append(h('div', { class: `fill ${cls}`, style: `width:${Math.max(0, Math.min(100, pct))}%` }));
-  for (const m of marks) b.append(h('div', { class: 'mark', style: `left:${m}%` }));
+  b.append(h('div', { class: `fill ${cls}`, style: { width: `${Math.max(0, Math.min(100, pct))}%` } }));
+  for (const m of marks) b.append(h('div', { class: 'mark', style: { left: `${m}%` } }));
   return b;
 }
 
@@ -139,14 +140,14 @@ function renderGlobal(s: OverlaySnapshot): HTMLElement {
   for (const p of detected) {
     const w = (p.tokensToday / denom) * 100;
     if (w <= 0) continue;
-    b.append(h('div', { class: 'fill split', style: `left:${left}%;width:${w}%;background:${PROVIDER_COLOR[p.id]}` }));
+    b.append(h('div', { class: 'fill split', style: { left: `${left}%`, width: `${w}%`, background: PROVIDER_COLOR[p.id] } }));
     left += w;
   }
 
   const legend = h('div', { class: 'legend' });
   for (const p of detected) {
     legend.append(
-      h('span', { style: `--c:${PROVIDER_COLOR[p.id]}`, title: `${p.name}: ${p.tokensToday.toLocaleString()} tokens today (${p.usageSource ?? 'n/a'})` }, `${shortName(p.id)} ${formatTokens(p.tokensToday)}`),
+      h('span', { style: { '--c': PROVIDER_COLOR[p.id] }, title: `${p.name}: ${p.tokensToday.toLocaleString()} tokens today (${p.usageSource ?? 'n/a'})` }, `${shortName(p.id)} ${formatTokens(p.tokensToday)}`),
     );
   }
   const pctLabel = s.dailyBudget > 0 ? `${Math.round(s.budgetPercent)}% of budget` : '';
@@ -221,7 +222,7 @@ function renderCard(p: ProviderSnapshot, s: OverlaySnapshot): HTMLElement {
     return l === 'newChat' || (l === 'compact' && acc === 'ok') ? l : acc;
   }, 'ok');
   const card = h('div', { class: `card ${worst}${p.detected ? '' : ' dim'}` });
-  const head = h('div', { class: 'card-head' }, h('span', { class: 'dot', style: `--c:${PROVIDER_COLOR[p.id]}` }), h('span', { class: 'pname' }, p.name));
+  const head = h('div', { class: 'card-head' }, h('span', { class: 'dot', style: { '--c': PROVIDER_COLOR[p.id] } }), h('span', { class: 'pname' }, p.name));
 
   if (!p.detected) {
     head.append(h('span', { class: 'ptitle' }, 'not detected'));

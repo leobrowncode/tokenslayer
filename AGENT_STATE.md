@@ -5,80 +5,53 @@
 
 ## Current project status
 
-Current roadmap position:
-
-- Completed through: [milestone / phase]
-- Current phase: [phase]
-- Current objective: [short description]
+- Completed through: v0.1.0, the first working overlay
+- Current phase: initial implementation under review
+- Current objective: Windows overlay showing Cursor / Claude Code / Codex token usage, with compact / new-chat alerts
 
 ## Completed
 
-- [Major completed milestone]
-- [Major completed milestone]
-- [Major completed milestone]
-
-Do not list every individual commit here.
+- Collectors for Claude Code (JSONL transcripts plus OAuth usage API), Codex (session JSONL, rate limits) and Cursor (`state.vscdb` plus cursor.com usage API)
+- Electron overlay: global bar, per-tool cards, collapsed mode, alert icon and advice panel, tray, toasts, shortcuts, config file
+- Windows packaging via electron-builder (NSIS and portable), GitHub Actions workflow
 
 ## Active work
 
-- Issue: #[number] — [title]
-- Branch: `[branch-name]`
-- Pull request: #[number]
-- Status: [implementation / fixing CI / review / ready for merge]
-
-If there is no active work:
-
 - Issue: none
-- Branch: none
-- Pull request: none
+- Branch: `cursor/token-usage-overlay-c063`
+- Pull request: initial implementation PR (draft)
+- Status: review
 
 ## Important decisions
 
-- [Important architectural decision or invariant]
-- [API/data model compatibility requirement]
-- [Business/domain invariant future agents must preserve]
-
-Only keep decisions that still constrain future development.
+- No native modules: Cursor's SQLite DB is read with the built-in `node:sqlite` (Electron 45 ships Node 24).
+- `src/core` must stay Electron-free so it can be unit-tested and run by `npm run probe`.
+- Network calls are opt-out, go only to the vendor's own domain, and never refresh or modify credentials.
+- The renderer CSP forbids inline style attributes; set styles through CSSOM (`el.style.setProperty`).
 
 ## Known limitations / blockers
 
-- [Current limitation]
-- [External dependency]
-- [Missing specification or decision]
-
-Remove resolved blockers.
+- Cursor's local schema and the cursor.com / Anthropic usage endpoints are undocumented. Parsers are defensive, but they have not been checked against a live account.
+- Not yet run on a real Windows desktop (built and UI-tested on Linux/X11 only).
 
 ## Validation baseline
 
-Relevant commands:
-
 ```bash
-[project test command]
-[lint command]
-[typecheck command]
-[build command]
+npm test
+npm run typecheck
+npm run build
+npm run dist:win:zip   # works on Linux too
 ```
 
-Current known baseline:
-
-- Backend tests: [count or N/A]
-- Frontend tests: [count or N/A]
-- CI: [passing / failing / unknown]
-
-Do not update test counts unless they are useful for detecting regressions.
+- Tests: 27 (vitest)
+- CI: `.github/workflows/build.yml` (unknown until first run)
 
 ## Next action
 
-Next run should:
-
-1. Fetch latest GitHub state.
-2. Check whether the active PR still exists.
-3. [Specific next development action.]
-
-Do not start another roadmap item while an active automation PR exists.
+1. Fetch latest GitHub state and check whether the PR was merged or has review comments.
+2. Fix any real-world schema mismatches reported for Cursor / Claude / Codex.
 
 ## Last updated
 
-- Date: YYYY-MM-DD
-- Main SHA: `[sha]`
-- Active PR/commit: [reference]
+- Date: 2026-10-21
+- Active PR/commit: branch `cursor/token-usage-overlay-c063`
